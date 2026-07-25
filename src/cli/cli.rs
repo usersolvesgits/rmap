@@ -3,7 +3,7 @@ use crate::tcp::tcp_commands::TCPCommands;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
+#[clap(name = "rmap", long_about = None)]
 pub struct Cli {
     /// The command to execute
     #[command(subcommand)]
