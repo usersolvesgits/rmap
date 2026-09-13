@@ -1,13 +1,12 @@
-use std::io::Write;
-
 mod models;
 mod cli;
 mod tcp;
 
-use crate::models::traits::CommandsAction;
+use crate::models::utils::CommandsAction;
 use crate::cli::cli::{Cli, Commands};
 
 use std::io;
+use std::io::Write;
 use clap::Parser;
 
 fn main() {
@@ -32,7 +31,7 @@ fn main() {
             }
         }
 
-        let input = input.trim();
+        let input: &str = input.trim();
         if input.is_empty() {
             continue
         }
@@ -71,13 +70,12 @@ fn main() {
                 match tcp.run() {
                     Ok(_) => {},
                     Err(err) => {
-                        println!("Error: Found error: {}\n", err);
+                        println!("Error: Found error during tcp scan: {}\n", err);
                         continue
                     },
                 }
             }
         }
-
     }
 }
 
