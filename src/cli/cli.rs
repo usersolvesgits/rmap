@@ -1,4 +1,5 @@
 use crate::tcp::tcp_commands::TCPCommands;
+use crate::udp::udp_commands::UDPCommands;
 
 use clap::{Parser, Subcommand};
 
@@ -19,4 +20,6 @@ pub enum Commands {
 
     /// Scans TCP ports.
     TCP(TCPCommands),
+    /// Scans UDP ports.
+    UDP(UDPCommands),
 }

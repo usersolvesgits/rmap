@@ -1,15 +1,16 @@
+use std::io::ErrorKind;
 use crate::models::utils::{CommandsAction, check_url};
 
 use clap::Args;
 use anyhow::Error;
-use std::net::{IpAddr, TcpStream, SocketAddr};
+use std::net::{IpAddr, UdpSocket, SocketAddr};
 use std::time::Duration;
 use std::collections::HashMap;
 
 #[derive(Args, Debug)]
-pub struct TCPCommands {
+pub struct UDPCommands {
     /// The ip address or url you want to scan. If none is specified, it will scan your local machine.
-    #[arg(default_value = "127.0.0.1")]
+    #[arg(short, long, default_value = "127.0.0.1")]
     target: String,
 
     /// The first port you want to scan from.
@@ -42,7 +43,7 @@ pub struct TCPCommands {
     #[arg(short = 'c', long="closed")]
     show_closed: bool,
 }
-impl CommandsAction for TCPCommands {
+impl CommandsAction for UDPCommands {
     fn run(&self) -> Result<(), Error> {
         let ip_target: IpAddr = match self.target.parse::<IpAddr>() {
             Ok(ip) => { ip }
@@ -72,46 +73,22 @@ impl CommandsAction for TCPCommands {
             show_port_status = ShowPortStatus::ShowAll;
         }
 
-        let tcp_services: HashMap<u16, &str> = HashMap::from([
-            (20, "ftp-data"),
-            (21, "ftp"),
-            (22, "ssh"),
-            (23, "telnet"),
-            (25, "smtp"),
+        let udp_services: HashMap<u16, &str> = HashMap::from([
             (53, "domain"),
-            (80, "http"),
+            (69, "tftp"),
             (88, "kerberos"),
-            (110, "pop3"),
             (135, "epmap"),
-            (139, "netbios-ssn"),
-            (143, "imap"),
-            (194, "irc"),
+            (137, "netbios-ns"),
+            (138, "netbios-dgm"),
             (389, "ldap"),
-            (443, "https"),
-            (445, "microsoft-ds"),
-            (465, "submissions"),
-            (587, "submission"),
             (631, "ipp"),
-            (636, "ldaps"),
-            (873, "rsync"),
-            (993, "imaps"),
-            (995, "pop3s"),
-            (1433, "ms-sql-s"),
-            (1521, "oracle"),
-            (1723, "pptp"),
-            (3306, "mysql"),
-            (3389, "ms-wbt-server"),
-            (5432, "postgresql"),
-            (5900, "vnc"),
-            (6379, "redis"),
-            (8080, "http-alt"),
-            (27017, "mongodb"),
+            (1701, "l2tp"),
         ]);
 
         if let Some(selected_ports) = &self.selected_ports {
             println!("| Port Number |    | Status |    | Service |");
             for port in selected_ports {
-                scan_ports(ip_target, port.to_owned(), timeout, &tcp_services, &show_port_status);
+                scan_ports(ip_target, port.to_owned(), timeout, &udp_services, &show_port_status);
             }
         } else {
             let first_port: u16;
@@ -140,7 +117,7 @@ impl CommandsAction for TCPCommands {
             println!("| Port Number |    | Status |    | Service |");
 
             for port in first_port..=last_port {
-                scan_ports(ip_target, port, timeout, &tcp_services, &show_port_status);
+                scan_ports(ip_target, port, timeout, &udp_services, &show_port_status);
             }
         }
 
@@ -152,7 +129,10 @@ impl CommandsAction for TCPCommands {
 
 enum PortStatus {
     Open,
-    Closed
+    Closed,
+    PermissionDenied,
+    TimedOut,
+    Error
 }
 enum ShowPortStatus {
     ShowOpen,
@@ -167,17 +147,48 @@ fn scan_ports(
     services: &HashMap<u16, &str>,
     show_port_status: &ShowPortStatus
 ) {
-    let socket_addr: SocketAddr = SocketAddr::new(ip_target, port);
-    match TcpStream::connect_timeout(&socket_addr, timeout) {
+    let socket: SocketAddr = SocketAddr::new(ip_target, port);
+
+    let udp_socket: UdpSocket = match UdpSocket::bind(socket) {
+        Ok(s) => s,
+        Err(_) => {
+            println!("ERROR: Could not bind UDP socket!");
+            return
+        }
+    };
+
+    match udp_socket.connect(socket) {
+        Ok(_) => { }
+        Err(_) => {
+            println!("ERROR: Could not connect to UDP socket!");
+            return
+        }
+    }
+
+    let mut send_data: [u8; 2048] = [0; 2048];
+    if let Err(_) = udp_socket.send(&mut send_data) {
+        println!("ERROR: Could not send data to UDP socket!");
+        return
+    }
+
+    let mut receive_data: [u8; 2048] = [0; 2048];
+    match udp_socket.recv(&mut receive_data) {
         Ok(_) => {
             let status_port: PortStatus = PortStatus::Open;
             get_port_info(&services, port, &status_port, &show_port_status);
         }
-        Err(_) => {
-            let status_port: PortStatus = PortStatus::Closed;
+        Err(e) => {
+            let status_port: PortStatus = match e.kind() {
+                ErrorKind::PermissionDenied => PortStatus::PermissionDenied,
+                ErrorKind::ConnectionRefused => PortStatus::Closed,
+                ErrorKind::TimedOut => PortStatus::TimedOut,
+                _ => PortStatus::Error,
+            };
             get_port_info(&services, port, &status_port, &show_port_status);
         }
     }
+
+    std::thread::sleep(timeout);
 }
 
 fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortStatus, show_status_port: &ShowPortStatus) {
@@ -197,8 +208,17 @@ fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortSta
 
                 ShowPortStatus::ShowClosed => {
                     match status_port {
+                        PortStatus::PermissionDenied => {
+                            println!("| {} |    | PERMISSION DENIED |    | {} |", port, s);
+                        }
                         PortStatus::Closed => {
                             println!("| {} |    | Closed |    | {} |", port, s);
+                        }
+                        PortStatus::TimedOut => {
+                            println!("| {} |    | CONNECTION TIMEDOUT |    | {} |", port, s);
+                        }
+                        PortStatus::Error => {
+                            println!("| {} |    | ERROR |    | {} |", port, s);
                         }
                         _ => {
                             return
@@ -211,8 +231,17 @@ fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortSta
                         PortStatus::Open => {
                             println!("| {} |    | Open |    | {} |", port, s);
                         }
+                        PortStatus::PermissionDenied => {
+                            println!("| {} |    | PERMISSION DENIED |    | {} |", port, s);
+                        }
                         PortStatus::Closed => {
                             println!("| {} |    | Closed |    | {} |", port, s);
+                        }
+                        PortStatus::TimedOut => {
+                            println!("| {} |    | CONNECTION TIMEDOUT |    | {} |", port, s);
+                        }
+                        PortStatus::Error => {
+                            println!("| {} |    | ERROR |    | {} |", port, s);
                         }
                     }
                 }
@@ -233,8 +262,17 @@ fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortSta
 
                 ShowPortStatus::ShowClosed => {
                     match status_port {
+                        PortStatus::PermissionDenied => {
+                            println!("| {} |    | PERMISSION DENIED |    | --- |", port);
+                        }
                         PortStatus::Closed => {
                             println!("| {} |    | Closed |    | --- |", port);
+                        }
+                        PortStatus::TimedOut => {
+                            println!("| {} |    | CONNECTION TIMEDOUT |    | --- |", port);
+                        }
+                        PortStatus::Error => {
+                            println!("| {} |    | ERROR |    | --- |", port);
                         }
                         _ => {
                             return
@@ -247,8 +285,17 @@ fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortSta
                         PortStatus::Open => {
                             println!("| {} |    | Open |    | --- |", port);
                         }
+                        PortStatus::PermissionDenied => {
+                            println!("| {} |    | PERMISSION DENIED |    | --- |", port);
+                        }
                         PortStatus::Closed => {
-                            println!("| {} |    | Closed |    | -- |", port);
+                            println!("| {} |    | Closed |    | --- |", port);
+                        }
+                        PortStatus::TimedOut => {
+                            println!("| {} |    | CONNECTION TIMEDOUT |    | --- |", port);
+                        }
+                        PortStatus::Error => {
+                            println!("| {} |    | ERROR |    | --- |", port);
                         }
                     }
                 }

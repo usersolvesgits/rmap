@@ -7,7 +7,14 @@ A bad version of *NMAP*, made with Rust.
 
 ## Current Features
 * Scan from IP address or URLS.
-* Scan of TCP ports
+* Scan of **TCP ports**
+  * Option to **set the first and last ports** you want to scan.
+  * Option to set a **custom range** of ports you want to scan.
+  * **Service recognition** for the most popular ports.
+  * Option to set a **custom delay** between scans.
+  * Option to print out **only** the open ports.
+  * Option to print out **only** the closed ports.
+* Scan of **UDP ports**
   * Option to **set the first and last ports** you want to scan.
   * Option to set a **custom range** of ports you want to scan.
   * **Service recognition** for the most popular ports.
@@ -16,6 +23,12 @@ A bad version of *NMAP*, made with Rust.
   * Option to print out **only** the closed ports.
 
 ## Planned changes
-* Adding `UDP scan`.
 * Exporting the last scan in different file formats `(.csv/.json)`.
 * Lowering the time to scan each port.
+
+## Crates Used
+| Crate                                 | Version | Features |
+|---------------------------------------| ------- | -------- |
+| [anyhow](https://crates.io/crates/anyhow) | 1.0.104 | |
+| [clap](https://crates.io/crates/clap) | 4.6.4 | derive |
+| [trust-dns-resolver](https://crates.io/crates/trust-dns-resolver) | 0.23.2 | |  

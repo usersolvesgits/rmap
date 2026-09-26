@@ -1,6 +1,7 @@
 mod models;
 mod cli;
 mod tcp;
+mod udp;
 
 use crate::models::utils::CommandsAction;
 use crate::cli::cli::{Cli, Commands};
@@ -73,6 +74,16 @@ fn main() {
                         println!("Error: Found error during tcp scan: {}\n", err);
                         continue
                     },
+                }
+            }
+
+            Commands::UDP(udp) => {
+                match udp.run() {
+                    Ok(_) => {},
+                    Err(err) => {
+                        println!("Error: Found error during udp scan: {}\n", err);
+                        continue
+                    }
                 }
             }
         }
