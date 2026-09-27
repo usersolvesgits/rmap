@@ -5,6 +5,8 @@ A bad version of *NMAP*, made with Rust.
 > 1) This project should not be taken seriously as it was made only for learning purposes only.  
 > 2) All the functionalities were tested on a Windows 11 machine.
 
+---
+
 ## Current Features
 * Scan from IP address or URLS.
 * Scan of **TCP ports**
@@ -22,9 +24,18 @@ A bad version of *NMAP*, made with Rust.
   * Option to print out **only** the open ports.
   * Option to print out **only** the closed ports.
 
+---
+
 ## Planned changes
 * Exporting the last scan in different file formats `(.csv/.json)`.
 * Lowering the time to scan each port.
+
+---
+
+## Known Bugs
+* While scanning UDP ports, the program will block on port 137
+
+---
 
 ## Crates Used
 | Crate                                 | Version | Features |
