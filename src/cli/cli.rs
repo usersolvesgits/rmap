@@ -19,7 +19,9 @@ pub enum Commands {
     Quit {},
 
     /// Scans TCP ports.
+    /// Press `Alt + S` to stop the scan prematurely.
     TCP(TCPCommands),
-    /// Scans UDP ports.
+    /// Scans UDP ports.  
+    /// Press `Alt + S` to stop the scan prematurely.
     UDP(UDPCommands),
 }

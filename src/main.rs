@@ -100,6 +100,7 @@ fn print_welcome() {
               ╚═╝  ╚═╝    ╚═╝     ╚═╝    ╚═╝  ╚═╝    ╚═╝");
     println!("Enter 'quit' to quit the program!");
     println!("Enter '--help' (or '-h') for options!");
+    println!("Press Alt + S to stop a scan prematurely!");
     println!("===============================================");
 
 }

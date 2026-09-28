@@ -23,6 +23,7 @@ A bad version of *NMAP*, made with Rust.
   * Option to set a **custom delay** between scans.
   * Option to print out **only** the open ports.
   * Option to print out **only** the closed ports.
+* Stop the scan at any time by pressing `Alt + S`
 
 ---
 
@@ -41,5 +42,6 @@ A bad version of *NMAP*, made with Rust.
 | Crate                                 | Version | Features |
 |---------------------------------------| ------- | -------- |
 | [anyhow](https://crates.io/crates/anyhow) | 1.0.104 | |
+| [crossterm](https://crates.io/crates/crossterm) | 0.29.0 | |
 | [clap](https://crates.io/crates/clap) | 4.6.4 | derive |
 | [trust-dns-resolver](https://crates.io/crates/trust-dns-resolver) | 0.23.2 | |  

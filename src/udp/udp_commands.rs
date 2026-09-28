@@ -6,6 +6,7 @@ use anyhow::Error;
 use std::net::{IpAddr, UdpSocket, SocketAddr};
 use std::time::Duration;
 use std::collections::HashMap;
+use crossterm::event::{self, poll, Event, KeyCode, KeyModifiers};
 
 #[derive(Args, Debug)]
 pub struct UDPCommands {
@@ -85,9 +86,20 @@ impl CommandsAction for UDPCommands {
             (1701, "l2tp"),
         ]);
 
+        const DURATION_KEYPRESSED_MS: Duration = Duration::from_millis(1);
+
         if let Some(selected_ports) = &self.selected_ports {
             println!("| Port Number |    | Status |    | Service |");
-            for port in selected_ports {
+
+            'scan: for port in selected_ports {
+                while poll(Duration::ZERO)? {
+                    if let Event::Key(key) = event::read()? {
+                        if key.code == KeyCode::Char('s') && key.modifiers == KeyModifiers::ALT {
+                            println!("Stopping the scan...");
+                            break 'scan;
+                        }
+                    }
+                }
                 scan_ports(ip_target, port.to_owned(), timeout, &udp_services, &show_port_status);
             }
         } else {
@@ -116,7 +128,15 @@ impl CommandsAction for UDPCommands {
 
             println!("| Port Number |    | Status |    | Service |");
 
-            for port in first_port..=last_port {
+            'scan: for port in first_port..=last_port {
+                while poll(Duration::ZERO)? {
+                    if let Event::Key(key) = event::read()? {
+                        if key.code == KeyCode::Char('s') && key.modifiers == KeyModifiers::ALT {
+                            println!("Stopping the scan...");
+                            break 'scan;
+                        }
+                    }
+                }
                 scan_ports(ip_target, port, timeout, &udp_services, &show_port_status);
             }
         }
