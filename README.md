@@ -23,7 +23,8 @@ A bad version of *NMAP*, made with Rust.
   * Option to set a **custom delay** between scans.
   * Option to print out **only** the open ports.
   * Option to print out **only** the closed ports.
-* Stop the scan at any time by pressing `Alt + S`
+* Stop the scan at any time by pressing `Alt + S`.
+* **Progress bar** to show the progress of the scan.
 
 ---
 
