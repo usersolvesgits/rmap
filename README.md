@@ -43,6 +43,7 @@ A bad version of *NMAP*, made with Rust.
 | Crate                                 | Version | Features |
 |---------------------------------------| ------- | -------- |
 | [anyhow](https://crates.io/crates/anyhow) | 1.0.104 | |
-| [crossterm](https://crates.io/crates/crossterm) | 0.29.0 | |
 | [clap](https://crates.io/crates/clap) | 4.6.4 | derive |
+| [crossterm](https://crates.io/crates/crossterm) | 0.29.0 | |
+| [indicatif](https://crates.io/crates/indicatif) | 0.18.6 | |
 | [trust-dns-resolver](https://crates.io/crates/trust-dns-resolver) | 0.23.2 | |  
