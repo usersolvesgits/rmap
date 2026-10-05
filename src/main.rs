@@ -9,6 +9,7 @@ use crate::cli::cli::{Cli, Commands};
 use std::io;
 use std::io::Write;
 use clap::Parser;
+use crossterm::{execute, cursor::MoveTo, terminal::{Clear, ClearType}};
 
 fn main() {
     print_welcome();
@@ -60,7 +61,13 @@ fn main() {
 
         match &result.command {
             Commands::Clear {} => {
-                print!("{esc}c", esc = 27 as char);
+                match execute!(io::stdout(), MoveTo(0, 0), Clear(ClearType::All)) {
+                    Ok(_) => {},
+                    Err(e) => {
+                        println!("Failed to clear console output!");
+                        eprintln!("{}", e);
+                    }
+                }
             }
 
             Commands::Quit {} => {

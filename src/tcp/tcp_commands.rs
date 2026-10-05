@@ -6,6 +6,7 @@ use std::net::{IpAddr, TcpStream, SocketAddr};
 use std::time::Duration;
 use std::collections::HashMap;
 use crossterm::event::{self, poll, Event, KeyCode, KeyModifiers};
+use indicatif::ProgressBar;
 
 #[derive(Args, Debug)]
 pub struct TCPCommands {
@@ -112,17 +113,11 @@ impl CommandsAction for TCPCommands {
         if let Some(selected_ports) = &self.selected_ports {
             println!("| Port Number |    | Status |    | Service |");
 
-            'scan: for port in selected_ports {
-                while poll(Duration::ZERO)? {
-                    if let Event::Key(key) = event::read()? {
-                        if key.code == KeyCode::Char('s') && key.modifiers == KeyModifiers::ALT {
-                            println!("Stopping the scan...");
-                            break 'scan;
-                        }
-                    }
-                }
-                scan_ports(ip_target, port.to_owned(), timeout, &tcp_services, &show_port_status);
-            }
+            let port_range = selected_ports.iter().copied();
+            let pb: ProgressBar = ProgressBar::new(selected_ports.len() as u64);
+
+            scan_loop(port_range, ip_target, timeout,
+                      &tcp_services, &show_port_status, &pb)?;
         } else {
             let first_port: u16;
             let last_port: u16;
@@ -149,17 +144,11 @@ impl CommandsAction for TCPCommands {
 
             println!("| Port Number |    | Status |    | Service |");
 
-            'scan: for port in first_port..=last_port {
-                while poll(Duration::ZERO)? {
-                    if let Event::Key(key) = event::read()? {
-                        if key.code == KeyCode::Char('s') && key.modifiers == KeyModifiers::ALT {
-                            println!("Stopping the scan...");
-                            break 'scan;
-                        }
-                    }
-                }
-                scan_ports(ip_target, port, timeout, &tcp_services, &show_port_status);
-            }
+            let port_range = first_port..=last_port;
+            let pb: ProgressBar = ProgressBar::new(port_range.len() as u64);
+
+            scan_loop(port_range, ip_target, timeout,
+                      &tcp_services, &show_port_status, &pb)?;
         }
 
         println!("Scan Terminated!");
@@ -178,34 +167,61 @@ enum ShowPortStatus {
     ShowAll
 }
 
+fn scan_loop(range_ports: impl Iterator<Item = u16>,
+             ip_target: IpAddr,
+             timeout: Duration,
+             services: &HashMap<u16, &str>,
+             show_port_status: &ShowPortStatus,
+             pb: &ProgressBar) -> Result<(), Error> {
+
+    for port in range_ports {
+        while poll(Duration::ZERO)? {
+            if let Event::Key(key) = event::read()? {
+                if key.code == KeyCode::Char('s') && key.modifiers == KeyModifiers::ALT {
+                    pb.println("Stopping the scan...");
+                    pb.abandon_with_message("Scan aborted!");
+                    return Ok(())
+                }
+            }
+        }
+        scan_ports(ip_target, port, timeout, services, show_port_status, pb);
+        pb.inc(1);
+    }
+    pb.finish_with_message("Scan complete!");
+
+    Ok(())
+}
+
 fn scan_ports(
     ip_target: IpAddr,
     port: u16,
     timeout: Duration,
     services: &HashMap<u16, &str>,
-    show_port_status: &ShowPortStatus
+    show_port_status: &ShowPortStatus,
+    pb: &ProgressBar
 ) {
     let socket_addr: SocketAddr = SocketAddr::new(ip_target, port);
     match TcpStream::connect_timeout(&socket_addr, timeout) {
         Ok(_) => {
             let status_port: PortStatus = PortStatus::Open;
-            get_port_info(&services, port, &status_port, &show_port_status);
+            get_port_info(&services, port, &status_port, &show_port_status, pb);
         }
         Err(_) => {
             let status_port: PortStatus = PortStatus::Closed;
-            get_port_info(&services, port, &status_port, &show_port_status);
+            get_port_info(&services, port, &status_port, &show_port_status, pb);
         }
     }
 }
 
-fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortStatus, show_status_port: &ShowPortStatus) {
+fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortStatus,
+                 show_status_port: &ShowPortStatus, pb: &ProgressBar) {
     match services.get(&port) {
         Some(s) => {
             match show_status_port {
                 ShowPortStatus::ShowOpen => {
                     match status_port {
                         PortStatus::Open => {
-                            println!("| {} |    | Open |    | {} |", port, s);
+                            pb.println(format!("| {} |    | Open |    | {} |", port, s));
                         }
                         _ => {
                             return
@@ -215,7 +231,7 @@ fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortSta
                 ShowPortStatus::ShowClosed => {
                     match status_port {
                         PortStatus::Closed => {
-                            println!("| {} |    | Closed |    | {} |", port, s);
+                            pb.println(format!("| {} |    | Closed |    | {} |", port, s));
                         }
                         _ => {
                             return
@@ -225,10 +241,10 @@ fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortSta
                 ShowPortStatus::ShowAll => {
                     match status_port {
                         PortStatus::Open => {
-                            println!("| {} |    | Open |    | {} |", port, s);
+                            pb.println(format!("| {} |    | Open |    | {} |", port, s));
                         }
                         PortStatus::Closed => {
-                            println!("| {} |    | Closed |    | {} |", port, s);
+                            pb.println(format!("| {} |    | Closed |    | {} |", port, s));
                         }
                     }
                 }
@@ -239,7 +255,7 @@ fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortSta
                 ShowPortStatus::ShowOpen => {
                     match status_port {
                         PortStatus::Open => {
-                            println!("| {} |    | Open |    | --- |", port);
+                            pb.println(format!("| {} |    | Open |    | --- |", port));
                         }
                         _ => {
                             return
@@ -249,7 +265,7 @@ fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortSta
                 ShowPortStatus::ShowClosed => {
                     match status_port {
                         PortStatus::Closed => {
-                            println!("| {} |    | Closed |    | --- |", port);
+                            pb.println(format!("| {} |    | Closed |    | --- |", port));
                         }
                         _ => {
                             return
@@ -259,10 +275,10 @@ fn get_port_info(services: &HashMap<u16, &str>, port: u16, status_port: &PortSta
                 ShowPortStatus::ShowAll => {
                     match status_port {
                         PortStatus::Open => {
-                            println!("| {} |    | Open |    | --- |", port);
+                            pb.println(format!("| {} |    | Open |    | --- |", port));
                         }
                         PortStatus::Closed => {
-                            println!("| {} |    | Closed |    | -- |", port);
+                            pb.println(format!("| {} |    | Closed |    | --- |", port));
                         }
                     }
                 }
